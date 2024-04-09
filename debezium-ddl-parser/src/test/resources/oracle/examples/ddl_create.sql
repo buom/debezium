@@ -630,6 +630,11 @@ CREATE TABLE "ESPP"."T_BUSINESS_OPERATION" (
   PARTITION "SYS_P1330" SEGMENT CREATION IMMEDIATE
   PCTFREE 10 PCTUSED 40 INITRANS 1 MAXTRANS 255
   NOCOMPRESS LOGGING);
+
+CREATE TABLE "TF"."T1" (
+     "VEXTCARDNBR" VARCHAR2(32) GENERATED ALWAYS AS (REPLACE("EXTCARDNBR",' ','')) VIRTUAL VISIBLE
+    ) ;
+
 -- Create index
 create index hr.name on hr.table (id,data) tablespace ts;
 create unique index idx_eshp_auction_file_history_id on eshp_auction_file_history(history_id);
