@@ -36,12 +36,14 @@ import io.debezium.config.CommonConnectorConfig;
 import io.debezium.config.Field;
 import io.debezium.connector.oracle.OracleConnectorConfig.ConnectorAdapter;
 import io.debezium.connector.oracle.logminer.SqlUtils;
+import io.debezium.data.SpecialValueDecimal;
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.relational.Attribute;
 import io.debezium.relational.Column;
 import io.debezium.relational.ColumnEditor;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.Tables.ColumnNameFilter;
@@ -112,6 +114,20 @@ public class OracleConnection extends JdbcConnection {
         if (showVersion) {
             LOGGER.info("Database Version: {}", databaseVersion.getBanner());
         }
+    }
+
+    @Override
+    public Object getColumnValue(ResultSet rs, int columnIndex, Column column, Table table) throws SQLException {
+        if (OracleTypes.NUMBER == column.jdbcType()) {
+            try {
+                return super.getColumnValue(rs, columnIndex, column, table);
+            }
+            catch (SQLException e) {
+                LOGGER.warn(e.getMessage());
+                return SpecialValueDecimal.POSITIVE_INF.getDecimalValue().orElse(null);
+            }
+        }
+        return super.getColumnValue(rs, columnIndex, column, table);
     }
 
     public void setSessionToPdb(String pdbName) {

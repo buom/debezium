@@ -44,6 +44,7 @@ import io.debezium.time.ZonedTimestamp;
 import io.debezium.util.NumberConversions;
 import io.debezium.util.Strings;
 
+import oracle.jdbc.OracleType;
 import oracle.jdbc.OracleTypes;
 import oracle.sql.BINARY_DOUBLE;
 import oracle.sql.BINARY_FLOAT;
@@ -114,9 +115,10 @@ public class OracleValueConverters extends JdbcValueConverters {
 
     @Override
     public SchemaBuilder schemaBuilder(Column column) {
-        logger.debug("Building schema for column {} of type {} named {} with constraints ({},{})",
+        logger.info("Building schema for column {} of type {} native-type {} named {} with constraints ({},{})",
                 column.name(),
                 column.jdbcType(),
+                column.nativeType(),
                 column.typeName(),
                 column.length(),
                 column.scale());
@@ -181,6 +183,12 @@ public class OracleValueConverters extends JdbcValueConverters {
 
     private SchemaBuilder variableScaleSchema(Column column) {
         if (decimalMode == DecimalMode.PRECISE) {
+            if (OracleType.FLOAT.getName().equals(column.typeName())) {
+                return SchemaBuilder.float64();
+            }
+            else if (OracleType.NUMBER.getName().equals(column.typeName())) {
+                return SpecialValueDecimal.builder(decimalMode, column.length(), column.scale().orElse(127));
+            }
             return VariableScaleDecimal.builder();
         }
         return SpecialValueDecimal.builder(decimalMode, column.length(), column.scale().orElse(-1));
@@ -246,14 +254,23 @@ public class OracleValueConverters extends JdbcValueConverters {
             return data -> convertNumeric(column, fieldDefn, data);
         }
         else {
+            if ("FLOAT".equals(column.typeName())) {
+                return data -> convertDouble(column, fieldDefn, data);
+            }
+            else if ("NUMBER".equals(column.typeName())) {
+                return data -> convertNumeric(column, fieldDefn, data);
+            }
             return data -> convertVariableScale(column, fieldDefn, data);
         }
     }
 
     @Override
     protected BigDecimal withScaleAdjustedIfNeeded(Column column, BigDecimal data) {
+        if (column.scale().isEmpty()) {
+            data = data.setScale(127);
+        }
         // deal with Oracle negative scales
-        if (column.scale().isPresent() && column.scale().get() < data.scale()) {
+        else if (column.scale().isPresent() && column.scale().get() < data.scale()) {
             data = data.setScale(column.scale().get());
         }
         return super.withScaleAdjustedIfNeeded(column, data);
@@ -554,7 +571,11 @@ public class OracleValueConverters extends JdbcValueConverters {
                 return VariableScaleDecimal.fromLogical(fieldDefn.schema(), (SpecialValueDecimal) data);
             }
             else if (data instanceof BigDecimal) {
-                return VariableScaleDecimal.fromLogical(fieldDefn.schema(), new SpecialValueDecimal((BigDecimal) data));
+                if ("FLOAT".equals(column.typeName())) {
+                    return ((BigDecimal) data).doubleValue();
+                }
+                return convertDecimal(column, fieldDefn, data);
+                // return VariableScaleDecimal.fromLogical(fieldDefn.schema(), new SpecialValueDecimal((BigDecimal) data));
             }
         }
         else {

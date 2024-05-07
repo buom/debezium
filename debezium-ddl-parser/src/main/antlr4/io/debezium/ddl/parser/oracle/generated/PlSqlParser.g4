@@ -3353,7 +3353,7 @@ virtual_column_definition
         (VISIBLE | INVISIBLE)?
         (GENERATED ALWAYS)?
         AS '(' expression ')'
-        VIRTUAL? evaluation_edition_clause? unusable_editions_clause? inline_constraint*
+        VIRTUAL? VISIBLE? evaluation_edition_clause? unusable_editions_clause? inline_constraint*
     ;
 
 annotations_clause
